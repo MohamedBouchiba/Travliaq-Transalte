@@ -35,8 +35,14 @@ class TranslatorService:
         mapped_code = self.LANG_CODE_MAP.get(clean_code.upper())
         if mapped_code:
             return mapped_code
-        if clean_code in self.tokenizer.lang_code_to_id:
-            return clean_code
+        # Check if the language code is valid by trying to convert it to token ID
+        try:
+            token_id = self.tokenizer.convert_tokens_to_ids(clean_code)
+            # If token_id is not the unknown token, it's valid
+            if token_id != self.tokenizer.unk_token_id:
+                return clean_code
+        except Exception:
+            pass
         raise ValueError(f"Unsupported language code: {language_code}")
 
     def normalize_language_code(self, language_code: str) -> str:
@@ -52,8 +58,12 @@ class TranslatorService:
 
         self.tokenizer.src_lang = source_lang_code
         inputs = self.tokenizer(text, return_tensors="pt")
-        forced_bos_token_id = self.tokenizer.lang_code_to_id.get(target_lang_code)
-        if forced_bos_token_id is None:
+        
+        # Use convert_tokens_to_ids to get the BOS token ID for the target language
+        forced_bos_token_id = self.tokenizer.convert_tokens_to_ids(target_lang_code)
+        
+        # Verify that we got a valid token ID (not the unknown token)
+        if forced_bos_token_id == self.tokenizer.unk_token_id:
             raise ValueError(f"Unsupported target language code: {target_language}")
 
         generated_tokens = self.model.generate(
